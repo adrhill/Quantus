@@ -54,9 +54,9 @@ class SymmetricRelevanceGain(Metric[List[float]]):
     Deviations from the paper, following Quantus conventions:
         - Features are flattened input entries grouped by the sorted attribution order
           (`features_in_step`), not superpixels. Attributions are broadcast over the
-          channel axis, so each pixel of a (C, H, W) image appears as C tied
-          features; with `features_in_step >= C` this closely matches flipping whole
-          pixels.
+          channel axis, so each pixel of a (C, H, W) image counts as C features.
+          Whole pixels are occluded only if `features_in_step` is a multiple of C,
+          otherwise individual color channels get occluded.
         - The tracked class is the user-supplied `y_batch`, not the model's prediction
           on the unoccluded input. For an exact paper replication pass
           `y_batch=model(x).argmax(1)`.
@@ -112,8 +112,11 @@ class SymmetricRelevanceGain(Metric[List[float]]):
         Parameters
         ----------
         features_in_step: integer
-            The size of the step, default=1. Note that SRG is designed for coarse
-            stepping; the paper uses 25-5000 superpixel groups per image.
+            The size of the step, default=1. Note that SRG is designed for coarse stepping. 
+            The paper uses 25-5000 superpixel groups per image. 
+            For multi-channel inputs, pass a multiple of the channel count C, so that each
+            step flips whole pixels rather than individual color channels.
+            The value must divide the flattened feature count C*H*W.
         abs: boolean
             Indicates whether absolute operation is applied on the attribution,
             default=False. SRG's symmetric design assumes the attribution's sign
@@ -326,10 +329,9 @@ class SymmetricRelevanceGain(Metric[List[float]]):
         -------
         None
         """
-        # Asserts.
         asserts.assert_features_in_step(
             features_in_step=self.features_in_step,
-            input_shape=x_batch.shape[2:],
+            input_shape=x_batch.shape[1:],
         )
 
     def evaluate_batch(
